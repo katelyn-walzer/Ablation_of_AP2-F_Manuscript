@@ -1,0 +1,660 @@
+---
+title: "Genetic ablation of a female specific Apetala 2 transcription factor blocks oocyst shedding in *Cryptosporidium parvum*"
+author: "<center>*Jayesh Tandel, Katelyn A. Walzer, Jessica H. Byerly, Brittain Pinkston, Daniel P. Beiting, and Boris Striepen*<center><br>"
+date: "<center> _`r Sys.Date()`_ <center>"
+output:
+  html_document:
+    code_folding: show
+    df_print: paged
+    theme: yeti
+    highlight: tango
+    toc: yes
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    number_sections: true
+  pdf_document:
+    fig_caption: yes
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+library(rmarkdown)
+library(tinytex)
+library(knitr)
+knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE)
+```
+
+# Introduction
+
+This reproducible and dynamic report was created using Rmarkdown and the [Knitr package](https://yihui.name/knitr/), and summarizes the basic code and outputs (plots, tables, etc) produced for this manuscript. 
+
+***
+
+# Background
+
+The apicomplexan parasite *Cryptosporidium* is a leading global cause of diarrheal disease, and the infection poses a particularly grave threat to young children, and those with weakened immune function. Infection occurs by ingestion of meiotic spores called oocysts, and transmission relies on fecal shedding of new oocysts. The entire lifecycle thus occurs in a single host and features asexual as well as sexual forms of replication. Here we identify and locus tag two Apetala 2-type (AP2) transcription factors and demonstrate that they are exclusively expressed in male and female gametes, respectively. To enable functional studies of essential genes in *C. parvum* we develop and validate a small molecule inducible gene excision system, which we apply to the female factor AP2-F to achieve conditional gene knock out. Analyzing this mutant, we find the factor to be dispensable for asexual growth and early female fate determination in vitro, but to be required for oocyst shedding in infected animals in vivo. Transcriptional analyses conducted in the presence or absence of AP2-F reveal that the factor controls the transcription of genes encoding crystalloid body proteins. These proteins are exclusively expressed in female gametes and in *C. parvum* the organelle is restricted to sporozoites.
+
+The code below shows how the raw data was preprocessed, mapped, and analyzed to identify the gene expression changes that occur upon loss of AP2-F.
+
+***
+
+# Reproducibility and accessibility
+
+In order to reproduce all steps listed below, including QC of raw reads and read mapping, raw fastq files will need to be downloaded from the Gene Expression Omnibus, under accession GSE216844. Prealigned data and all code used in this analysis, including the Rmarkdown document used to compile this supplementary code file, are all available on GitHub [here](https://github.com/katelyn-walzer/Ablation_of_AP2-F_Manuscript). Once this GitHub repo has been downloaded, navigate to /Ablation_of_AP2-F_Manuscript/ANALYSIS/code to find the Rmarkdown document as well as an RProject file. This should be your working directory for executing code.
+
+***
+
+# R packages used for this analysis
+
+A variety of R packages was used for this analysis.  All graphics and data wrangling were handled using the [tidyverse suite of packages](https://www.tidyverse.org/).  All packages used are available from the Comprehensive R Archive Network (CRAN), Bioconductor.org, or Github.  
+
+```{r R packages}
+library(tidyverse) 
+library(tximport)
+library(biomaRt)
+library(hrbrthemes) 
+library(RColorBrewer) 
+library(reshape2)
+library(genefilter) 
+library(edgeR) 
+library(matrixStats)
+library(DT) 
+library(gt) 
+library(plotly) 
+library(skimr)
+library(limma)
+```
+
+***
+
+# Read mapping
+
+## Aligning raw reads with Kallisto
+
+Quality control of raw reads was carried out using fastqc. Raw reads were mapped to the version 50 *Cryptosporidium parvum* Iowa II reference transcriptome available on VEuPathDB using Kallisto, version 0.45.0. 
+
+```{r fastqc and Kallisto pseudoalignment, eval=FALSE}
+#Kallisto make new reference using CryptoDB version 50
+#Use annotated transcripts file
+kallisto index -i CryptoDB-50_CparvumIowaII_AnnotatedTranscripts.index CryptoDB-50_CparvumIowaII_AnnotatedTranscripts.fasta
+
+
+#Run fastqc
+fastqc WTControl1-Jayesh-Katie_S1_mergedLanes_R1_001.fastq.gz -t 24 -o /data/striepenlab/Katelyn_Walzer_data/Jayesh_manuscript/AP2_F_Knockout/fastqc
+fastqc WTControl2-Jayesh-Katie_S2_mergedLanes_R1_001.fastq.gz -t 24 -o /data/striepenlab/Katelyn_Walzer_data/Jayesh_manuscript/AP2_F_Knockout/fastqc
+fastqc WTControl3-Jayesh-Katie_S3_mergedLanes_R1_001.fastq.gz -t 24 -o /data/striepenlab/Katelyn_Walzer_data/Jayesh_manuscript/AP2_F_Knockout/fastqc
+fastqc WTRap1-Jayesh-Katie_S4_mergedLanes_R1_001.fastq.gz -t 24 -o /data/striepenlab/Katelyn_Walzer_data/Jayesh_manuscript/AP2_F_Knockout/fastqc
+fastqc WTRap2-Jayesh-Katie_S5_mergedLanes_R1_001.fastq.gz -t 24 -o /data/striepenlab/Katelyn_Walzer_data/Jayesh_manuscript/AP2_F_Knockout/fastqc
+fastqc WTRap3-Jayesh-Katie_S6_mergedLanes_R1_001.fastq.gz -t 24 -o /data/striepenlab/Katelyn_Walzer_data/Jayesh_manuscript/AP2_F_Knockout/fastqc
+fastqc AP2-FControl1-Jayesh-Katie_S7_mergedLanes_R1_001.fastq.gz -t 24 -o /data/striepenlab/Katelyn_Walzer_data/Jayesh_manuscript/AP2_F_Knockout/fastqc
+fastqc AP2-FControl2-Jayesh-Katie_S8_mergedLanes_R1_001.fastq.gz -t 24 -o /data/striepenlab/Katelyn_Walzer_data/Jayesh_manuscript/AP2_F_Knockout/fastqc
+fastqc AP2-FControl3-Jayesh-Katie_S9_mergedLanes_R1_001.fastq.gz -t 24 -o /data/striepenlab/Katelyn_Walzer_data/Jayesh_manuscript/AP2_F_Knockout/fastqc
+fastqc AP2-FRap1-Jayesh-Katie_S10_mergedLanes_R1_001.fastq.gz -t 24 -o /data/striepenlab/Katelyn_Walzer_data/Jayesh_manuscript/AP2_F_Knockout/fastqc
+fastqc AP2-FRap2-Jayesh-Katie_S11_mergedLanes_R1_001.fastq.gz -t 24 -o /data/striepenlab/Katelyn_Walzer_data/Jayesh_manuscript/AP2_F_Knockout/fastqc
+fastqc AP2-FRap3-Jayesh-Katie_S12_mergedLanes_R1_001.fastq.gz -t 24 -o /data/striepenlab/Katelyn_Walzer_data/Jayesh_manuscript/AP2_F_Knockout/fastqc
+
+
+#Run alignment with kallisto to CryptoDB version 50
+#Average length of fragment is 300 bp from TapeStation
+#Decrease standard deviation to 30
+kallisto quant -i CryptoDB-50_CparvumIowaII_AnnotatedTranscripts.index -o WT_Ctrl_rep_1 -t 24 -b 60 --single -l 300 -s 30 WTControl1-Jayesh-Katie_S1_mergedLanes_R1_001.fastq.gz
+kallisto quant -i CryptoDB-50_CparvumIowaII_AnnotatedTranscripts.index -o WT_Ctrl_rep_2 -t 24 -b 60 --single -l 300 -s 30 WTControl2-Jayesh-Katie_S2_mergedLanes_R1_001.fastq.gz
+kallisto quant -i CryptoDB-50_CparvumIowaII_AnnotatedTranscripts.index -o WT_Ctrl_rep_3 -t 24 -b 60 --single -l 300 -s 30 WTControl3-Jayesh-Katie_S3_mergedLanes_R1_001.fastq.gz
+kallisto quant -i CryptoDB-50_CparvumIowaII_AnnotatedTranscripts.index -o WT_Rap_rep_1 -t 24 -b 60 --single -l 300 -s 30 WTRap1-Jayesh-Katie_S4_mergedLanes_R1_001.fastq.gz
+kallisto quant -i CryptoDB-50_CparvumIowaII_AnnotatedTranscripts.index -o WT_Rap_rep_2 -t 24 -b 60 --single -l 300 -s 30 WTRap2-Jayesh-Katie_S5_mergedLanes_R1_001.fastq.gz
+kallisto quant -i CryptoDB-50_CparvumIowaII_AnnotatedTranscripts.index -o WT_Rap_rep_3 -t 24 -b 60 --single -l 300 -s 30 WTRap3-Jayesh-Katie_S6_mergedLanes_R1_001.fastq.gz
+kallisto quant -i CryptoDB-50_CparvumIowaII_AnnotatedTranscripts.index -o AP2_F_Ctrl_rep_1 -t 24 -b 60 --single -l 300 -s 30 AP2-FControl1-Jayesh-Katie_S7_mergedLanes_R1_001.fastq.gz
+kallisto quant -i CryptoDB-50_CparvumIowaII_AnnotatedTranscripts.index -o AP2_F_Ctrl_rep_2 -t 24 -b 60 --single -l 300 -s 30 AP2-FControl2-Jayesh-Katie_S8_mergedLanes_R1_001.fastq.gz
+kallisto quant -i CryptoDB-50_CparvumIowaII_AnnotatedTranscripts.index -o AP2_F_Ctrl_rep_3 -t 24 -b 60 --single -l 300 -s 30 AP2-FControl3-Jayesh-Katie_S9_mergedLanes_R1_001.fastq.gz
+kallisto quant -i CryptoDB-50_CparvumIowaII_AnnotatedTranscripts.index -o AP2_F_Rap_rep_1 -t 24 -b 60 --single -l 300 -s 30 AP2-FRap1-Jayesh-Katie_S10_mergedLanes_R1_001.fastq.gz
+kallisto quant -i CryptoDB-50_CparvumIowaII_AnnotatedTranscripts.index -o AP2_F_Rap_rep_2 -t 24 -b 60 --single -l 300 -s 30 AP2-FRap2-Jayesh-Katie_S11_mergedLanes_R1_001.fastq.gz
+kallisto quant -i CryptoDB-50_CparvumIowaII_AnnotatedTranscripts.index -o AP2_F_Rap_rep_3 -t 24 -b 60 --single -l 300 -s 30 AP2-FRap3-Jayesh-Katie_S12_mergedLanes_R1_001.fastq.gz
+```
+
+***
+
+## Importing count data into R
+
+After read mapping with Kallisto, [TxImport](https://bioconductor.org/packages/release/bioc/html/tximport.html) was used to read kallisto outputs into the R environment.  
+
+```{r TxImport}
+# read in study design ----
+targets <- read_tsv("Study_Design_AP2_F_DiCre_Feb_2021.txt")
+
+# create file paths to the abundance files generated by Kallisto using the 'file.path' function
+path <- file.path(targets$sample, "abundance.h5")
+
+# check to make sure this path is correct by seeing if the files exist
+all(file.exists(path)) 
+
+# use dplyr to modify study design to include these file paths as a new column.
+targets <- mutate(targets, path)
+
+# import Kallisto transcript counts into R using Tximport ----
+Txi_gene <- tximport(path, 
+                     type = "kallisto", 
+                     txOut = TRUE,
+                     countsFromAbundance = "lengthScaledTPM")
+
+myCPM <- as_tibble(Txi_gene$abundance, rownames = "geneSymbol") # counts after adjusting for transcript length
+myCounts <- as_tibble(Txi_gene$counts, rownames = "geneSymbol") # counts per million (CPM) 
+
+```
+
+***
+
+# Identification of differentially expressed genes upon rapamycin treatment and AP2-F knockout
+
+## Filtering and normalization
+
+```{r Filtering and Normalization}
+# Identify variables of interest in study design file ----
+groups1 <- targets$strain_condition
+groups1 <- factor(groups1)
+sampleLabels <- targets$sample
+
+# Examine data up to this point ----
+myCPM <- Txi_gene$abundance
+myCounts <- Txi_gene$counts
+
+# graph both matrices 
+colSums(myCPM)
+colSums(myCounts)
+
+# Take a look at the heteroskedasticity of the data ----
+# first, calculate row means and standard deviations for each transcript or gene 
+# and add these to the data matrix
+myCPM.stats <- transform(myCPM, 
+                         SD=rowSds(myCPM), 
+                         AVG=rowMeans(myCPM),
+                         MED=rowMedians(myCPM)
+)
+
+
+# produce a scatter plot of the transformed data
+ggplot(myCPM.stats, aes(x=SD, y=MED)) +
+  geom_point(shape=16, size=2)
+
+
+# Make a DGElist from the counts, and plot ----
+myDGEList <- DGEList(Txi_gene$counts)
+
+
+save(myDGEList, file = "myDGEList")
+
+
+# use the 'cpm' function from EdgeR to get counts per million
+cpm <- cpm(myDGEList) 
+log2.cpm <- cpm(myDGEList, log=TRUE)
+
+
+# Take a look at the distribution of the Log2 CPM
+nsamples <- ncol(log2.cpm)
+# now select colors from a single palette
+myColors <- brewer.pal(nsamples, "Paired")
+
+# 'coerce' the data matrix to a dataframe to use tidyverse tools on it
+log2.cpm.df <- as_tibble(log2.cpm)
+
+colnames(log2.cpm.df) <- sampleLabels
+
+# use the reshape2 package to 'melt' dataframe (from wide to tall)
+log2.cpm.df.melt <- melt(log2.cpm.df)
+
+
+ggplot(log2.cpm.df.melt, aes(x=variable, y=value, fill=variable)) +
+  geom_violin(trim = FALSE, show.legend = FALSE) +
+  stat_summary(fun.y = "median", geom = "point", shape = 124, size = 6, color = "black", show.legend = FALSE) +
+  labs(y="log2 expression", x = "sample",
+       title="Log2 Counts per Million (CPM)",
+       subtitle="unfiltered, non-normalized",
+       caption=paste0("produced on ", Sys.time())) + 
+  coord_flip() 
+
+# Filter the data ----
+#first, take a look at how many genes or transcripts have no read counts at all
+table(rowSums(myDGEList$counts==0)==12)
+
+# set some cut-off to get rid of genes/transcripts with low counts
+keepers <- rowSums(cpm>10)>=3 #last number is replicates, min replicates, at least expressed ten times
+myDGEList.filtered <- myDGEList[keepers,]
+dim(myDGEList.filtered)
+
+log2.cpm.filtered <- cpm(myDGEList.filtered, log=TRUE)
+log2.cpm.filtered.df <- as_tibble(log2.cpm.filtered) 
+colnames(log2.cpm.filtered.df) <- sampleLabels
+log2.cpm.filtered.df.melt <- melt(log2.cpm.filtered.df)
+
+ggplot(log2.cpm.filtered.df.melt, aes(x=variable, y=value, fill=variable)) +
+  geom_violin(trim = FALSE, show.legend = FALSE) +
+  stat_summary(fun.y = "median", geom = "point", shape = 124, size = 6, color = "black", show.legend = FALSE) +
+  labs(y="log2 expression", x = "sample",
+       title="Log2 Counts per Million (CPM)",
+       subtitle="filtered, non-normalized",
+       caption=paste0("produced on ", Sys.time())) +
+  coord_flip() 
+
+# Normalize the data ----
+myDGEList.filtered.norm <- calcNormFactors(myDGEList.filtered, method = "TMM")
+
+# use the 'cpm' function from EdgeR to get counts per million from the normalized data
+log2.cpm.filtered.norm <- cpm(myDGEList.filtered.norm, log=TRUE)
+log2.cpm.filtered.norm.df <- as_tibble(log2.cpm.filtered.norm)
+colnames(log2.cpm.filtered.norm.df) <- sampleLabels
+log2.cpm.filtered.norm.df.melt <- melt(log2.cpm.filtered.norm.df)
+
+ggplot(log2.cpm.filtered.norm.df.melt, aes(x=variable, y=value, fill=variable)) +
+  geom_violin(trim = FALSE, show.legend = FALSE) +
+  stat_summary(fun.y = "median", geom = "point", shape = 124, size = 6, color = "black", show.legend = FALSE) +
+  labs(y="log2 expression", x = "sample",
+       title="Log2 Counts per Million (CPM)",
+       subtitle="filtered, TMM normalized",
+       caption=paste0("produced on ", Sys.time())) +
+  coord_flip() 
+
+# Need to convert the datamatrix to a dataframe, while preserving the rownames as a new column in the dataframe
+mydata.df <- as_tibble(log2.cpm.filtered.norm, rownames = "geneSymbol")
+colnames(mydata.df) <- c("geneSymbol", sampleLabels)
+mydata.melt <- as_tibble(melt(mydata.df))
+
+write_tsv(mydata.df, "normData_CryptoDB_AP2_F_Knockdown.txt") 
+#This data was used for GSEA analysis using the Desktop Software GSEA 4.3.2
+#Number of permutations is 1000
+#Enrichment statistic weighted
+#Metric for ranking genes Diff_of_Classes
+#All other parameters kept as default
+
+```
+
+Filtering was carried out to remove lowly expressed genes. For filtering, only genes with >= 10 counts per million (CPM) in at least 3 or more samples were kept. This reduced the number of genes from `r nrow(myDGEList)` to `r nrow(myDGEList.filtered)`.  
+
+***
+
+## PCA of data after filtering and normalization
+
+```{r PCA plot}
+# Principal component analysis (PCA) -------------
+pca.res <- prcomp(t(log2.cpm.filtered.norm), scale.=F, retx=T)
+x <- pca.res$rotation 
+pc.var<-pca.res$sdev^2 
+pc.per<-round(pc.var/sum(pc.var)*100, 1)
+pc.per
+
+# Visualize the PCA result ------------------
+pca.res.df <- as_tibble(pca.res$x)
+ggplot(pca.res.df, aes(x=PC1, y=PC2, color=targets$strain_condition)) +
+  geom_point(size=8) +
+  theme_bw() +
+  xlab(paste0("PC1 (",pc.per[1],"%",")")) + 
+  ylab(paste0("PC2 (",pc.per[2],"%",")")) +
+  labs(title="PCA plot of strains and treatment groups") +
+  theme(legend.title = element_blank()) +
+  theme(axis.text=element_text(size = 14),
+        axis.title = element_text(size=16),
+        plot.title=element_text(face = "bold", size = 20),
+        legend.text = element_text(size=16)) 
+```
+
+***
+
+## Volcano plots of WT and AP2-F DiCre untreated and rapamycin treated parasites
+
+```{r Volcano plots}
+# Set up the design matrix ----
+groups1 <- relevel(groups1, "AP2_F_rap")
+design <- model.matrix(~0 + groups1)
+colnames(design) <- levels(groups1)
+
+
+# Model mean-variance trend and fit linear model to data ----
+# Use VOOM function from Limma package to model the mean-variance relationship
+v.DGEList.filtered.norm <- voom(myDGEList.filtered.norm, design, plot = TRUE)
+# fit a linear model to your data
+fit <- lmFit(v.DGEList.filtered.norm, design)
+
+
+# Contrast matrix ----
+# how do parasites respond to rapamycin treatment? What is the effect of the knockdown?
+contrast.matrix <- makeContrasts(AP2F_rap_AP2F_ctrl = AP2_F_rap - AP2_F_control,
+                                 WT_rap_WT_ctrl = WT_rap - WT_control,
+                                 AP2F_ctrl_WT_ctrl = AP2_F_control - WT_control,
+                                 AP2F_rap_WT_rap = AP2_F_rap - WT_rap,
+                                 levels=design)
+
+
+# extract the linear model fit -----
+fits <- contrasts.fit(fit, contrast.matrix)
+ebFit <- eBayes(fits)
+
+# TopTable to view differentially expressed genes -----
+
+#myTopHits is AP2_F rapamycin versus AP2_F control
+myTopHits <- topTable(ebFit, adjust ="BH", coef=1, number=10000, sort.by="logFC")
+
+# convert to a tibble
+myTopHits <- as_tibble(myTopHits, rownames = "geneSymbol")
+
+
+
+#myTopHits2 is WT rapamycin versus WT control
+myTopHits2 <- topTable(ebFit, adjust ="BH", coef=2, number=10000, sort.by="logFC")
+
+# convert to a tibble
+myTopHits2 <- as_tibble(myTopHits2, rownames = "geneSymbol")
+
+
+
+#myTopHits3 is AP2_F ctrl versus WT control
+myTopHits3 <- topTable(ebFit, adjust ="BH", coef=3, number=10000, sort.by="logFC")
+
+# convert to a tibble
+myTopHits3 <- as_tibble(myTopHits3, rownames = "geneSymbol")
+
+
+
+#myTopHits4 is AP2_F rapamycin versus WT rapamycin
+myTopHits4 <- topTable(ebFit, adjust ="BH", coef=4, number=10000, sort.by="logFC")
+
+# convert to a tibble
+myTopHits4 <- as_tibble(myTopHits4, rownames = "geneSymbol")
+
+
+
+#Pull out genes from final LOPIT paper submission, column tagm.class.pam.pred.lab
+crystalloid_body_LOPIT_submission_AP2_F <- subset(myTopHits,
+                                                  geneSymbol=="cgd1_1510-RA" |
+                                                    geneSymbol=="cgd2_2100-RA" |
+                                                    geneSymbol=="cgd2_2110-RA" |
+                                                    geneSymbol=="cgd2_790-RA" |
+                                                    geneSymbol=="cgd6_313-RA" |
+                                                    geneSymbol=="cgd6_820-RA" |
+                                                    geneSymbol=="cgd7_1730-RA" |
+                                                    geneSymbol=="cgd7_300-RA" |
+                                                    geneSymbol=="cgd7_4810-RA" |
+                                                    geneSymbol=="cgd7_5140-RA" |
+                                                    geneSymbol=="cgd8_4290-RA" |
+                                                    geneSymbol=="cgd8_4300-RA" |
+                                                    geneSymbol=="cgd8_4310-RA" )
+
+
+oocyst_wall_LOPIT_submission_AP2_F <- subset(myTopHits,
+                                             geneSymbol== "cgd1_3550-RA" |
+                                               geneSymbol== "cgd1_800-RA" |
+                                               geneSymbol== "cgd2_1590-RA" |
+                                               geneSymbol== "cgd2_2510-RA" |
+                                               geneSymbol== "cgd2_3040-RA" |
+                                               geneSymbol== "cgd2_4350-RA" |
+                                               geneSymbol== "cgd2_850-RA" |
+                                               geneSymbol== "cgd3_1540-RA" |
+                                               geneSymbol== "cgd3_1860-RA" |
+                                               geneSymbol== "cgd3_190-RA" |
+                                               geneSymbol== "cgd3_3700-RA" |
+                                               geneSymbol== "cgd4_3090-RA" |
+                                               geneSymbol== "cgd4_500-RA" |
+                                               geneSymbol== "cgd4_670-RA" |
+                                               geneSymbol== "cgd5_3073-RA" |
+                                               geneSymbol== "cgd6_1450-RA" |
+                                               geneSymbol== "cgd6_200-RA" |
+                                               geneSymbol== "cgd6_2090-RA" |
+                                               geneSymbol== "cgd6_210-RA" |
+                                               geneSymbol== "cgd6_2470-RA" |
+                                               geneSymbol== "cgd6_2900-RA" |
+                                               geneSymbol== "cgd6_2920-RA" |
+                                               geneSymbol== "cgd6_3730-RA" |
+                                               geneSymbol== "cgd6_4440-RA" |
+                                               geneSymbol== "cgd6_4640-RA" |
+                                               geneSymbol== "cgd6_4840-RA" |
+                                               geneSymbol== "cgd6_670-RA" |
+                                               geneSymbol== "cgd6_710-RA" |
+                                               geneSymbol== "cgd7_180-RA" |
+                                               geneSymbol== "cgd7_1800-RA" |
+                                               geneSymbol== "cgd7_4310-RA" |
+                                               geneSymbol== "cgd7_4560-RA" |
+                                               geneSymbol== "cgd7_5150-RA" |
+                                               geneSymbol== "cgd7_5400-RA" |
+                                               geneSymbol== "cgd7_850-RA" |
+                                               geneSymbol== "cgd8_2670-RA" |
+                                               geneSymbol== "cgd8_3350-RA" |
+                                               geneSymbol== "cgd8_3870-RA" |
+                                               geneSymbol== "cgd8_4230-RA" |
+                                               geneSymbol== "cgd8_4660-RA" |
+                                               geneSymbol== "cgd8_4830-RA" |
+                                               geneSymbol== "cgd8_5080-RA" |
+                                               geneSymbol== "cgd8_5090-RA" |
+                                               geneSymbol== "cgd8_620-RA")
+
+crystalloid_body_LOPIT_submission_WT <- subset(myTopHits2,
+                                               geneSymbol=="cgd1_1510-RA" |
+                                                 geneSymbol=="cgd2_2100-RA" |
+                                                 geneSymbol=="cgd2_2110-RA" |
+                                                 geneSymbol=="cgd2_790-RA" |
+                                                 geneSymbol=="cgd6_313-RA" |
+                                                 geneSymbol=="cgd6_820-RA" |
+                                                 geneSymbol=="cgd7_1730-RA" |
+                                                 geneSymbol=="cgd7_300-RA" |
+                                                 geneSymbol=="cgd7_4810-RA" |
+                                                 geneSymbol=="cgd7_5140-RA" |
+                                                 geneSymbol=="cgd8_4290-RA" |
+                                                 geneSymbol=="cgd8_4300-RA" |
+                                                 geneSymbol=="cgd8_4310-RA" )
+
+
+oocyst_wall_LOPIT_submission_WT <- subset(myTopHits2,
+                                          geneSymbol== "cgd1_3550-RA" |
+                                            geneSymbol== "cgd1_800-RA" |
+                                            geneSymbol== "cgd2_1590-RA" |
+                                            geneSymbol== "cgd2_2510-RA" |
+                                            geneSymbol== "cgd2_3040-RA" |
+                                            geneSymbol== "cgd2_4350-RA" |
+                                            geneSymbol== "cgd2_850-RA" |
+                                            geneSymbol== "cgd3_1540-RA" |
+                                            geneSymbol== "cgd3_1860-RA" |
+                                            geneSymbol== "cgd3_190-RA" |
+                                            geneSymbol== "cgd3_3700-RA" |
+                                            geneSymbol== "cgd4_3090-RA" |
+                                            geneSymbol== "cgd4_500-RA" |
+                                            geneSymbol== "cgd4_670-RA" |
+                                            geneSymbol== "cgd5_3073-RA" |
+                                            geneSymbol== "cgd6_1450-RA" |
+                                            geneSymbol== "cgd6_200-RA" |
+                                            geneSymbol== "cgd6_2090-RA" |
+                                            geneSymbol== "cgd6_210-RA" |
+                                            geneSymbol== "cgd6_2470-RA" |
+                                            geneSymbol== "cgd6_2900-RA" |
+                                            geneSymbol== "cgd6_2920-RA" |
+                                            geneSymbol== "cgd6_3730-RA" |
+                                            geneSymbol== "cgd6_4440-RA" |
+                                            geneSymbol== "cgd6_4640-RA" |
+                                            geneSymbol== "cgd6_4840-RA" |
+                                            geneSymbol== "cgd6_670-RA" |
+                                            geneSymbol== "cgd6_710-RA" |
+                                            geneSymbol== "cgd7_180-RA" |
+                                            geneSymbol== "cgd7_1800-RA" |
+                                            geneSymbol== "cgd7_4310-RA" |
+                                            geneSymbol== "cgd7_4560-RA" |
+                                            geneSymbol== "cgd7_5150-RA" |
+                                            geneSymbol== "cgd7_5400-RA" |
+                                            geneSymbol== "cgd7_850-RA" |
+                                            geneSymbol== "cgd8_2670-RA" |
+                                            geneSymbol== "cgd8_3350-RA" |
+                                            geneSymbol== "cgd8_3870-RA" |
+                                            geneSymbol== "cgd8_4230-RA" |
+                                            geneSymbol== "cgd8_4660-RA" |
+                                            geneSymbol== "cgd8_4830-RA" |
+                                            geneSymbol== "cgd8_5080-RA" |
+                                            geneSymbol== "cgd8_5090-RA" |
+                                            geneSymbol== "cgd8_620-RA")
+
+
+#Make a volcano plot for AP2-F DiCre untreated and treated
+ggplot(myTopHits, aes(y=-log10(adj.P.Val), x=logFC, text = paste("Symbol:", geneSymbol))) + geom_point(size=4) +
+  geom_point(mapping = NULL, oocyst_wall_LOPIT_submission_AP2_F, size = 4, colour = "mediumpurple2", inherit.aes = TRUE) +
+  geom_point(mapping = NULL, crystalloid_body_LOPIT_submission_AP2_F, size = 4, colour = "magenta", inherit.aes = TRUE) +
+  ylim(-0.5,10) +
+  xlim(-4,4) +
+  geom_hline(yintercept = -log10(0.01), linetype="dashed", colour="grey", size=0.5) +
+  geom_hline(yintercept = -log10(0.05), linetype="dashed", colour="grey", size=1) +
+  geom_vline(xintercept = 1, linetype="longdash", colour="grey", size=1) +
+  geom_vline(xintercept = -1, linetype="longdash", colour="grey", size=1) +
+  theme_bw() +
+  theme(axis.text=element_text(size = 14),
+        axis.title = element_text(size=16),
+        plot.title=element_text(face = "bold", size = 20),
+        plot.subtitle = element_text(size=16)) +
+  labs(title="Effects of DiCre-mediated knockout of AP2-F") 
+
+#Make a volcano plot for WT untreated and treated
+ggplot(myTopHits2, aes(y=-log10(adj.P.Val), x=logFC, text = paste("Symbol:", geneSymbol))) +
+  geom_point(size=4) +
+  geom_point(mapping = NULL, oocyst_wall_LOPIT_submission_WT, size = 4, colour = "mediumpurple2", inherit.aes = TRUE) +
+  geom_point(mapping = NULL, crystalloid_body_LOPIT_submission_WT, size = 4, colour = "magenta", inherit.aes = TRUE) +
+  ylim(-0.5,10) +
+  xlim(-4,4) +
+  geom_hline(yintercept = -log10(0.01), linetype="dashed", colour="grey", size=0.5) +
+  geom_hline(yintercept = -log10(0.05), linetype="dashed", colour="grey", size=1) +
+  geom_vline(xintercept = 1, linetype="longdash", colour="grey", size=1) +
+  geom_vline(xintercept = -1, linetype="longdash", colour="grey", size=1) +
+  theme_bw() +
+  theme(axis.text=element_text(size = 14),
+        axis.title = element_text(size=16),
+        plot.title=element_text(face = "bold", size = 20)) +
+  labs(title="Effects of rapamycin treatment on WT")
+
+```
+
+***
+
+## Table of differentially expressed genes
+
+To identify differentially expressed genes, precision weights were first applied to each gene based on its mean-variance relationship using [VOOM](https://genomebiology.biomedcentral.com/articles/10.1186/gb-2014-15-2-r29), then data was normalized using the [TMM method](https://genomebiology.biomedcentral.com/articles/10.1186/gb-2010-11-3-r25) in [EdgeR](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2796818/).  Linear modeling and bayesian stats were employed via [Limma](https://academic.oup.com/nar/article/43/7/e47/2414268) to find genes that were up- or down-regulated by a log2-transformed fold change of 1 or more, with a false-discovery rate (FDR) of 0.01. 
+
+```{r Table of differentially expressed genes, eval=FALSE}
+# decideTests to pull out the DEGs ----
+results <- decideTests(ebFit, method="global", adjust.method="BH", p.value=0.01, lfc=1)
+
+# retrieve expression data for DEGs ----
+head(v.DGEList.filtered.norm$E)
+colnames(v.DGEList.filtered.norm$E) <- sampleLabels
+
+#This gives all the DiffGenes, regardless of significance between samples (only needs to be significant in one)
+diffGenes <- v.DGEList.filtered.norm$E[results[,1] !=0 | results[,2] !=0 | results[,3] !=0 | results[,4] !=0,]
+head(diffGenes)
+dim(diffGenes)
+#convert DEGs to a dataframe using as_tibble
+diffGenes.df <- as_tibble(diffGenes, rownames = "geneSymbol")
+
+
+#Adding averages to Diff Genes
+#This is where to make new files for gene expression log-fold changes
+Differential_genes_avg.df <- mutate(diffGenes.df,
+                                    WT_Ctrl.AVG = (WT_Ctrl_rep_1 + WT_Ctrl_rep_2 + WT_Ctrl_rep_3)/3,
+                                    WT_Rap.AVG = (WT_Rap_rep_1 + WT_Rap_rep_2 + WT_Rap_rep_3)/3,
+                                    AP2_F_Ctrl.AVG = (AP2_F_Ctrl_rep_1 + AP2_F_Ctrl_rep_2 + AP2_F_Ctrl_rep_3)/3,
+                                    AP2_F_Rap.AVG = (AP2_F_Rap_rep_1 + AP2_F_Rap_rep_2 + AP2_F_Rap_rep_3)/3,
+                                    
+                                    
+                                    #now make columns comparing each of the averages above 
+                                    #do as rapamycin likely downregulates, so put control first
+                                    
+                                    LogFC.AP2F_rap_vs_AP2F_ctrl = (AP2_F_Rap.AVG - AP2_F_Ctrl.AVG),
+                                    LogFC.WT_rap_vs_WT_ctrl = (WT_Rap.AVG - WT_Ctrl.AVG),
+                                    LogFC.AP2F_ctrl_vs_WT_ctrl = (AP2_F_Ctrl.AVG - WT_Ctrl.AVG),
+                                    LogFC.AP2F_rap_vs_WT_rap = (AP2_F_Rap.AVG - WT_Rap.AVG)) %>%
+  mutate_if(is.numeric, round, 3)
+
+#This is Supplemental File 1
+write_tsv(Differential_genes_avg.df, "2021_5_20_Differential_genes_avg_CryptoDB_50_AP2F_knockdown_DiCre.txt")
+
+
+#write DEGs to a file
+write_tsv(diffGenes.df,"2021_5_20_DiffGenes_CryptoDB_50_LFC1.txt") 
+
+#Check different ones, add as new spreadsheets to Supplemental File 1
+#AP2F_rap_vs_AP2F_ctrl
+diffGenes_AP2F <- v.DGEList.filtered.norm$E[results[,1] !=0,]
+head(diffGenes_AP2F)
+dim(diffGenes_AP2F)
+#convert DEGs to a dataframe using as_tibble
+diffGenes_AP2F.df <- as_tibble(diffGenes_AP2F, rownames = "geneSymbol")
+
+
+Differential_genes_avg_AP2F.df <- mutate(diffGenes_AP2F.df,
+                                         AP2_F_Ctrl.AVG = (AP2_F_Ctrl_rep_1 + AP2_F_Ctrl_rep_2 + AP2_F_Ctrl_rep_3)/3,
+                                         AP2_F_Rap.AVG = (AP2_F_Rap_rep_1 + AP2_F_Rap_rep_2 + AP2_F_Rap_rep_3)/3,
+                                         #now make columns comparing each of the averages above 
+                                         LogFC.AP2F_rap_vs_AP2F_ctrl = (AP2_F_Rap.AVG - AP2_F_Ctrl.AVG)) %>%
+  mutate_if(is.numeric, round, 3)
+
+
+write_tsv(Differential_genes_avg_AP2F.df, "2021_5_20_Differential_genes_avg_AP2F_only_LFC1.txt")
+
+
+#WT_rap_vs_WT_ctrl
+diffGenes_WT <- v.DGEList.filtered.norm$E[results[,2] !=0,]
+head(diffGenes_WT)
+dim(diffGenes_WT)
+#convert DEGs to a dataframe using as_tibble
+diffGenes_WT.df <- as_tibble(diffGenes_WT, rownames = "geneSymbol")
+
+#Error, only giving cgd2_4100 but no gene ID, no dims (not significant - adjusted p value just above 0.01)
+Differential_genes_avg_WT.df <- mutate(diffGenes_WT.df,
+                                       WT_Ctrl.AVG = (WT_Ctrl_rep_1 + WT_Ctrl_rep_2 + WT_Ctrl_rep_3)/3,
+                                       WT_Rap.AVG = (WT_Rap_rep_1 + WT_Rap_rep_2 + WT_Rap_rep_3)/3,
+                                       #now make columns comparing each of the averages above 
+                                       LogFC.WT_rap_vs_WT_ctrl = (WT_Rap.AVG - WT_Ctrl.AVG)) %>%
+  mutate_if(is.numeric, round, 3)
+
+
+write_tsv(Differential_genes_avg_WT.df, "2021_5_20_Differential_genes_avg_WT_only_LFC1.txt")
+
+
+#AP2F_ctrl_vs_WT_ctrl
+diffGenes_ctrl <- v.DGEList.filtered.norm$E[results[,3] !=0,]
+head(diffGenes_ctrl)
+dim(diffGenes_ctrl)
+#convert DEGs to a dataframe using as_tibble
+diffGenes_ctrl.df <- as_tibble(diffGenes_ctrl, rownames = "geneSymbol")
+
+Differential_genes_avg_ctrl.df <- mutate(diffGenes_ctrl.df,
+                                         WT_Ctrl.AVG = (WT_Ctrl_rep_1 + WT_Ctrl_rep_2 + WT_Ctrl_rep_3)/3,
+                                         AP2_F_Ctrl.AVG = (AP2_F_Ctrl_rep_1 + AP2_F_Ctrl_rep_2 + AP2_F_Ctrl_rep_3)/3,
+                                         #now make columns comparing each of the averages above 
+                                         LogFC.AP2F_ctrl_vs_WT_ctrl = (AP2_F_Ctrl.AVG - WT_Ctrl.AVG)) %>%
+  mutate_if(is.numeric, round, 3)
+
+
+write_tsv(Differential_genes_avg_ctrl.df, "2021_5_25_Differential_genes_avg_ctrl_only_LFC1.txt")
+
+
+#AP2F_rap_vs_WT_rap
+diffGenes_rap <- v.DGEList.filtered.norm$E[results[,4] !=0,]
+head(diffGenes_rap)
+dim(diffGenes_rap)
+#convert DEGs to a dataframe using as_tibble
+diffGenes_rap.df <- as_tibble(diffGenes_rap, rownames = "geneSymbol")
+
+Differential_genes_avg_rap.df <- mutate(diffGenes_rap.df,
+                                        WT_Rap.AVG = (WT_Rap_rep_1 + WT_Rap_rep_2 + WT_Rap_rep_3)/3,
+                                        AP2_F_Rap.AVG = (AP2_F_Rap_rep_1 + AP2_F_Rap_rep_2 + AP2_F_Rap_rep_3)/3,
+                                        #now make columns comparing each of the averages above 
+                                        LogFC.AP2F_rap_vs_WT_rap = (AP2_F_Rap.AVG - WT_Rap.AVG)) %>%
+  mutate_if(is.numeric, round, 3)
+
+
+write_tsv(Differential_genes_avg_rap.df, "2021_5_25_Differential_genes_avg_rap_only_LFC1.txt")
+
+```
+
+***
+
+# Session info
+
+The output from running 'sessionInfo' is shown below and details all packages and versions necessary to reproduce the results in this report.
+
+```{r session info}
+sessionInfo()
+```
+
+
+
