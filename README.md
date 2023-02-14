@@ -6,7 +6,7 @@ The apicomplexan parasite *Cryptosporidium* is a leading global cause of diarrhe
 
 ## DIRECTORY OUTLINE
 
-/ANALYSIS - contains the Rmarkdown (.rmd) file that contains all code for the paper, now published in mBio. Also contains the R file with code. Outputs used for sequencing analysis are in this folder, as well as the study design file. The table for differentially expressed genes (color-coded for AP2-F and crystalloid body) is also in this folder.
+/ANALYSIS - contains the Rmarkdown (.rmd) file that includes all code for the paper, now published in mBio. Also contains the R file with code. Outputs used for sequencing analysis are in this folder, as well as the study design file. The table for differentially expressed genes (color-coded for AP2-F and crystalloid body) is also in this folder.
 
 /ANALYSIS/GSEA - contains the files used for gene set enrichment analysis of oocyst wall and crystalloid body genes.
 
