@@ -1,0 +1,13 @@
+{
+	"n_targets": 4023,
+	"n_bootstraps": 60,
+	"n_processed": 27164589,
+	"n_pseudoaligned": 157243,
+	"n_unique": 144420,
+	"p_pseudoaligned": 0.6,
+	"p_unique": 0.5,
+	"kallisto_version": "0.46.0",
+	"index_version": 10,
+	"start_time": "Mon Feb 15 01:53:38 2021",
+	"call": "kallisto quant -i CryptoDB-50_CparvumIowaII_AnnotatedTranscripts.index -o AP2_F_Rap_rep_2 -t 24 -b 60 --single -l 300 -s 30 AP2-FRap2-Jayesh-Katie_S11_mergedLanes_R1_001.fastq.gz"
+}

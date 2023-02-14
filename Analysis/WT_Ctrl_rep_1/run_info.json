@@ -1,0 +1,13 @@
+{
+	"n_targets": 4023,
+	"n_bootstraps": 60,
+	"n_processed": 38286653,
+	"n_pseudoaligned": 239764,
+	"n_unique": 221375,
+	"p_pseudoaligned": 0.6,
+	"p_unique": 0.6,
+	"kallisto_version": "0.46.0",
+	"index_version": 10,
+	"start_time": "Thu Feb 18 10:07:31 2021",
+	"call": "kallisto quant -i CryptoDB-50_CparvumIowaII_AnnotatedTranscripts.index -o WT_Ctrl_rep_1 -t 24 -b 60 --single -l 300 -s 30 WTControl1-Jayesh-Katie_S1_mergedLanes_R1_001.fastq.gz"
+}

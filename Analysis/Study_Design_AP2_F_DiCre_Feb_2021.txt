@@ -1,0 +1,13 @@
+sample	stage	replicate	experiment	host	condition	strain_condition
+WT_Ctrl_rep_1	sexual	1	1	human	control	WT_control
+WT_Ctrl_rep_2	sexual	2	1	human	control	WT_control
+WT_Ctrl_rep_3	sexual	3	1	human	control	WT_control
+WT_Rap_rep_1	sexual	1	1	human	rapamycin	WT_rap
+WT_Rap_rep_2	sexual	2	1	human	rapamycin	WT_rap
+WT_Rap_rep_3	sexual	3	1	human	rapamycin	WT_rap
+AP2_F_Ctrl_rep_1	sexual	1	1	human	control	AP2_F_control
+AP2_F_Ctrl_rep_2	sexual	2	1	human	control	AP2_F_control
+AP2_F_Ctrl_rep_3	sexual	3	1	human	control	AP2_F_control
+AP2_F_Rap_rep_1	sexual	1	1	human	rapamycin	AP2_F_rap
+AP2_F_Rap_rep_2	sexual	2	1	human	rapamycin	AP2_F_rap
+AP2_F_Rap_rep_3	sexual	3	1	human	rapamycin	AP2_F_rap
